@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grocery List Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Libraries for export functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Include Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/auth.css">
+</head>
+<body>
+    <!-- Auth Container (initially visible) -->
+    <div class="auth-container" id="authContainer">
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="loginTab">Login</button>
+            <button class="auth-tab" id="signupTab">Sign Up</button>
+        </div>
+        
+        <form class="auth-form" id="loginForm">
+            <div class="form-group">
+                <label class="form-label" for="loginEmail">Email</label>
+                <input type="email" class="form-input" id="loginEmail" placeholder="Enter your email" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="loginPassword">Password</label>
+                <input type="password" class="form-input" id="loginPassword" placeholder="Enter your password" required>
+            </div>
+            <button type="submit" class="btn btn-login">Login</button>
+        </form>
+        
+        <form class="auth-form" id="signupForm" style="display: none;">
+            <div class="form-group">
+                <label class="form-label" for="signupEmail">Email</label>
+                <input type="email" class="form-input" id="signupEmail" placeholder="Enter your email" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="signupPassword">Password</label>
+                <input type="password" class="form-input" id="signupPassword" placeholder="Create a password" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="confirmPassword">Confirm Password</label>
+                <input type="password" class="form-input" id="confirmPassword" placeholder="Confirm your password" required>
+            </div>
+            <button type="submit" class="btn btn-login">Sign Up</button>
+        </form>
+    </div>
+
+    <!-- Main App Container (initially hidden) -->
+    <div class="app-container" id="appContainer" style="display: none;">
+        <header class="app-header">
+            <h1><i class="fas fa-shopping-basket"></i> Grocery List</h1>
+            <div class="user-info">
+                <span class="user-email" id="userEmail"></span>
+                <button class="btn btn-logout" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
+        </header>
+
+        <!-- Current List Tab -->
+        <div class="tab-content active" id="current-tab">
+            <div class="filter-row">
+                <div class="filter-item">
+                    <span class="filter-label">Month:</span>
+                    <select class="filter-select" id="month"></select>
+                </div>
+                <div class="filter-item">
+                    <span class="filter-label">Year:</span>
+                    <select class="filter-select" id="year"></select>
+                </div>
+                <div class="filter-item">
+                    <span class="filter-label">Store:</span>
+                    <input type="text" class="filter-input" id="supermarket" placeholder="Store">
+                </div>
+            </div>
+
+            <input type="text" class="list-name-input" id="listName" placeholder="List Name (optional)">
+
+            <button class="btn btn-add" id="addItemBtn"><i class="fas fa-plus"></i> Add Item</button>
+            
+            <div class="items-container" id="itemsContainer">
+                <div class="empty-state" id="emptyState">
+                    <i class="fas fa-shopping-cart"></i>
+                    <p>Your list is empty</p>
+                    <button class="btn btn-add" id="addFirstItem"><i class="fas fa-plus"></i> Add Your First Item</button>
+                </div>
+            </div>
+
+            <div class="summary">
+                <h3>Order Summary</h3>
+                <div class="summary-row"><span>Subtotal:</span><span id="subtotal">0.00</span></div>
+                <div class="summary-row"><span>Total Discount:</span><span id="totalDiscount">0.00</span></div>
+                <div class="summary-row"><span>Total GST:</span><span id="totalGst">0.00</span></div>
+                <div class="summary-row total"><span>Total Amount:</span><span id="totalAmount">0.00</span></div>
+            </div>
+
+            <div class="share-section" id="shareSection">
+                <h3><i class="fas fa-share-alt"></i> Share List</h3>
+                <div class="share-input-group">
+                    <input type="email" class="share-input" id="shareEmail" placeholder="Enter email to share with">
+                    <button class="btn btn-share" id="shareBtn">Share</button>
+                </div>
+                <div class="shared-with" id="sharedWith">
+                    <h4>Shared with:</h4>
+                    <!-- Shared users will be listed here -->
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-save" id="saveList"><i class="fas fa-save"></i> Save List</button>
+                <button class="btn btn-delete" id="clearList"><i class="fas fa-trash"></i> Clear All</button>
+            </div>
+        </div>
+
+        <!-- Summary Tab -->
+        <div class="tab-content" id="summary-tab">
+            <div class="filter-row">
+                <div class="filter-item">
+                    <span class="filter-label">Year:</span>
+                    <select class="filter-select" id="summary-year">
+                        <option value="all">All</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Yearly Summary Card -->
+            <div class="yearly-summary">
+                <h3><i class="fas fa-chart-line"></i> Yearly Summary</h3>
+                <div class="yearly-summary-content">
+                    <div class="yearly-stat">
+                        <div class="yearly-stat-value" id="yearly-total">₹0.00</div>
+                        <div class="yearly-stat-label">Total Spending</div>
+                    </div>
+                    <div class="yearly-stat">
+                        <div class="yearly-stat-value" id="yearly-lists">0</div>
+                        <div class="yearly-stat-label">Lists Created</div>
+                    </div>
+                    <div class="yearly-stat">
+                        <div class="yearly-stat-value" id="yearly-stores">0</div>
+                        <div class="yearly-stat-label">Stores Visited</div>
+                    </div>
+                    <div class="yearly-stat">
+                        <div class="yearly-stat-value" id="yearly-items">0</div>
+                        <div class="yearly-stat-label">Items Purchased</div>
+                    </div>
+                    <div class="yearly-comparison">
+                        <div id="yearly-comparison-text">No previous year data</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="summary">
+                <h3><i class="fas fa-calendar"></i> Monthly Summary</h3>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th class="left-align">Month</th>
+                            <th class="center-align">Store</th>
+                            <th class="right-align">Total Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summary-table-body">
+                        <tr>
+                            <td colspan="3" style="text-align: center;">No data available</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="summary">
+                <h3><i class="fas fa-store"></i> Store Summary</h3>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th class="left-align">Store</th>
+                            <th class="right-align">Total Amount</th>
+                            <th class="right-align">Visit Count</th>
+                        </tr>
+                    </thead>
+                    <tbody id="store-summary-body">
+                        <tr>
+                            <td colspan="3" style="text-align: center;">No data available</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Saved Lists Tab -->
+        <div class="tab-content" id="saved-tab">
+            <div class="filter-row">
+                <div class="filter-item">
+                    <span class="filter-label">Year:</span>
+                    <select class="filter-select" id="saved-year">
+                        <option value="all">All</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <span class="filter-label">Store:</span>
+                    <select class="filter-select" id="saved-store">
+                        <option value="all">All</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="export-buttons">
+                <button class="btn btn-export" id="exportPdf"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                <button class="btn btn-export" id="exportExcel"><i class="fas fa-file-excel"></i> Export Excel</button>
+            </div>
+
+            <div class="saved-lists">
+                <h3><i class="fas fa-history"></i> Saved Lists</h3>
+                <div id="savedListsContainer">
+                    <div class="empty-state" style="padding: 20px;">
+                        <i class="fas fa-folder-open"></i>
+                        <p>No saved lists yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav" id="bottomNav" style="display: none;">
+        <button class="nav-btn active" data-tab="current-tab">
+            <i class="fas fa-list"></i>
+            <span>Current</span>
+        </button>
+        <button class="nav-btn" data-tab="summary-tab">
+            <i class="fas fa-chart-pie"></i>
+            <span>Summary</span>
+        </button>
+        <button class="nav-btn" data-tab="saved-tab">
+            <i class="fas fa-history"></i>
+            <span>Saved</span>
+        </button>
+    </nav>
+
+    <!-- Add/Edit Item Modal -->
+    <div class="modal" id="itemModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Add Item</h2>
+                <button class="close-modal" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="itemDescription">Item Name</label>
+                    <input type="text" class="form-input" id="itemDescription" placeholder="Enter item name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="itemQuantity">Quantity</label>
+                    <input type="number" class="form-input" id="itemQuantity" min="1" value="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="itemUom">Unit</label>
+                    <input type="text" class="form-input" id="itemUom" placeholder="e.g., kg, pcs">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="itemMrp">MRP (₹)</label>
+                    <input type="number" class="form-input" id="itemMrp" min="0" value="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="itemRate">Rate (₹)</label>
+                    <input type="number" class="form-input" id="itemRate" min="0" value="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="itemGst">GST (%)</label>
+                    <input type="number" class="form-input" id="itemGst" min="0" value="5" step="1">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-delete" id="cancelItem">Cancel</button>
+                <button class="btn btn-save" id="saveItem">Save Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification">
+        <i class="fas fa-check-circle"></i>
+        <span id="notification-text">List saved successfully!</span>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script type="module" src="js/supabaseClient.js"></script>
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/listManager.js"></script>
+    <script type="module" src="js/exportUtils.js"></script>
+    <script type="module" src="js/summary.js"></script>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
