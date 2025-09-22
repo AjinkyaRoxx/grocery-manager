@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const yearlyComparisonText = document.getElementById('yearly-comparison-text');
     
     // Form inputs for new unit system
-    const hsn = document.getElementById('hsn');
+    const hsn = document.getElementById('hsncode'); // instead of 'hsn'
     const itemDescription = document.getElementById('itemDescription');
     const itemQuantity = document.getElementById('itemQuantity');
     const itemTotalPrice = document.getElementById('itemTotalPrice');
@@ -1027,5 +1027,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize the app
     init();
 });
+
 
 
