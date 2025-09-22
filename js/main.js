@@ -553,173 +553,147 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Render saved lists from Supabase
-    async function renderSavedLists() {
-        savedListsContainer.innerHTML = '';
-        
-        try {
-            // Get user's lists and lists shared with the user
-            const { data: userLists, error: userError } = await supabase
-                .from('grocery_lists')
-                .select('*')
-                .eq('user_id', getCurrentUser().id)
-                .order('created_at', { ascending: false });
-            
-            if (userError) throw userError;
-            
-            const { data: sharedLists, error: sharedError } = await supabase
-                .from('list_shares')
-                .select(`
-                    grocery_lists (*)
-                `)
-                .eq('user_id', getCurrentUser().id);
-            
-            if (sharedError) throw sharedError;
-            
-            // Combine user's lists and shared lists
-            const allLists = [
-                ...userLists,
-                ...sharedLists.map(share => share.grocery_lists)
-            ];
-            
-            // Apply filters
-            const yearFilter = savedYearSelect.value;
-            const storeFilter = savedStoreSelect.value;
-            
-            const filteredLists = allLists.filter(list => {
-                if (yearFilter !== 'all' && list.year != yearFilter) return false;
-                if (storeFilter !== 'all' && list.supermarket !== storeFilter) return false;
-                return true;
+async function renderSavedLists() {
+    savedListsContainer.innerHTML = '';
+
+    try {
+        // 🔍 Fetch user's own lists
+        const { data: userLists, error: userError, status: userStatus } = await supabase
+            .from('grocery_lists')
+            .select('*')
+            .eq('user_id', getCurrentUser().id)
+            .order('created_at', { ascending: false });
+
+        if (userError) {
+            console.error("Error fetching user lists:", {
+                status: userStatus,
+                message: userError.message,
+                details: userError.details,
+                hint: userError.hint
             });
-            
-            if (filteredLists.length === 0) {
-                savedListsContainer.innerHTML = `
-                    <div class="empty-state" style="padding: 20px;">
-                        <i class="fas fa-folder-open"></i>
-                        <p>No saved lists found</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            // Create a list item for each saved list
-            filteredLists.forEach(list => {
-                const listName = list.name || 'Unnamed List';
-                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                const monthName = months[list.month - 1] || 'Unknown';
-                const savedDate = new Date(list.created_at);
-                const formattedDate = savedDate.toLocaleDateString() + ' ' + savedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                const isOwner = list.user_id === getCurrentUser().id;
-                
-                const listItem = document.createElement('div');
-                listItem.className = 'list-item';
-                listItem.innerHTML = `
-                    <div class="list-info">
-                        <div class="list-name">${listName} ${!isOwner ? '(Shared)' : ''}</div>
-                        <div class="list-details">
-                            <span class="list-detail-item">
-                                <i class="fas fa-calendar"></i>
-                                ${monthName} ${list.year}
-                            </span>
-                            <span class="list-detail-item">
-                                <i class="fas fa-store"></i>
-                                ${list.supermarket || 'Unknown Store'}
-                            </span>
-                            <span class="list-detail-item">
-                                <i class="fas fa-receipt"></i>
-                                ₹${list.total_amount || '0.00'}
-                            </span>
-                            <span class="list-detail-item">
-                                <i class="fas fa-clock"></i>
-                                ${formattedDate}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="list-actions">
-                        <button class="btn btn-save load-btn">Load</button>
-                        ${isOwner ? `<button class="btn btn-delete delete-btn">Delete</button>` : ''}
-                    </div>
-                `;
-                
-                // Add event listeners
-                listItem.querySelector('.load-btn').addEventListener('click', async () => {
-                    const listData = await loadList(list.id);
-                    if (listData) {
-                        // Clear the current items
-                        setItems([]);
-                        
-                        // Add items from the saved list
-                        if (listData.items && Array.isArray(listData.items)) {
-                            setItems(listData.items);
-                        }
-                        
-                        // Update supermarket input if available
-                        if (listData.supermarket) {
-                            supermarketInput.value = listData.supermarket;
-                        }
-                        
-                        // Update month and year selects if available
-                        if (listData.month) {
-                            monthSelect.value = listData.month;
-                        }
-                        
-                        if (listData.year) {
-                            yearSelect.value = listData.year;
-                        }
-                        
-                        // Update list name if available
-                        if (listData.name) {
-                            listNameInput.value = listData.name;
-                        }
-                        
-                        // Set as current list
-                        setCurrentListId(listData.id);
-                        
-                        saveItems();
-                        renderItems();
-                        updateSummary();
-                        switchTab('current-tab');
-                        
-                        // Load shared users for this list
-                        loadSharedUsersHandler();
-                        
-                        // Show success message
-                        showMessage('List loaded successfully');
-                    }
-                });
-                
-                if (isOwner) {
-                    listItem.querySelector('.delete-btn').addEventListener('click', async () => {
-                        if (confirm('Are you sure you want to delete this list?')) {
-                            const success = await deleteList(list.id);
-                            if (success) {
-                                // If we're deleting the current list, clear the currentListId
-                                if (getCurrentListId() === list.id) {
-                                    setCurrentListId(null);
-                                }
-                                
-                                renderSavedLists();
-                                updateSummaryFilters();
-                                updateSavedFilters();
-                                generateSummaryHandler();
-                                
-                                showMessage('List deleted successfully');
-                            }
-                        }
-                    });
-                }
-                
-                savedListsContainer.appendChild(listItem);
+            throw userError;
+        }
+
+        // 🔍 Fetch lists shared with the user
+        const { data: sharedLists, error: sharedError, status: sharedStatus } = await supabase
+            .from('list_shares')
+            .select('grocery_lists (*)')
+            .eq('user_id', getCurrentUser().id);
+
+        if (sharedError) {
+            console.error("Error fetching shared lists:", {
+                status: sharedStatus,
+                message: sharedError.message,
+                details: sharedError.details,
+                hint: sharedError.hint
             });
-        } catch (error) {
-            console.error('Error loading saved lists:', error);
+            throw sharedError;
+        }
+
+        // 🧠 Combine and filter lists
+        const allLists = [
+            ...userLists,
+            ...sharedLists.map(share => share.grocery_lists)
+        ];
+
+        const yearFilter = savedYearSelect.value;
+        const storeFilter = savedStoreSelect.value;
+
+        const filteredLists = allLists.filter(list => {
+            if (yearFilter !== 'all' && list.year != yearFilter) return false;
+            if (storeFilter !== 'all' && list.supermarket !== storeFilter) return false;
+            return true;
+        });
+
+        if (filteredLists.length === 0) {
             savedListsContainer.innerHTML = `
                 <div class="empty-state" style="padding: 20px;">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error loading lists</p>
+                    <i class="fas fa-folder-open"></i>
+                    <p>No saved lists found</p>
                 </div>
             `;
+            return;
         }
+
+        // 🧱 Render each list item
+        filteredLists.forEach(list => {
+            const listName = list.name || 'Unnamed List';
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const monthName = months[list.month - 1] || 'Unknown';
+            const savedDate = new Date(list.created_at);
+            const formattedDate = savedDate.toLocaleDateString() + ' ' + savedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const isOwner = list.user_id === getCurrentUser().id;
+
+            const listItem = document.createElement('div');
+            listItem.className = 'list-item';
+            listItem.innerHTML = `
+                <div class="list-info">
+                    <div class="list-name">${listName} ${!isOwner ? '(Shared)' : ''}</div>
+                    <div class="list-details">
+                        <span class="list-detail-item"><i class="fas fa-calendar"></i> ${monthName} ${list.year}</span>
+                        <span class="list-detail-item"><i class="fas fa-store"></i> ${list.supermarket || 'Unknown Store'}</span>
+                        <span class="list-detail-item"><i class="fas fa-receipt"></i> ₹${list.total_amount || '0.00'}</span>
+                        <span class="list-detail-item"><i class="fas fa-clock"></i> ${formattedDate}</span>
+                    </div>
+                </div>
+                <div class="list-actions">
+                    <button class="btn btn-save load-btn">Load</button>
+                    ${isOwner ? `<button class="btn btn-delete delete-btn">Delete</button>` : ''}
+                </div>
+            `;
+
+            // 🧭 Load button handler
+            listItem.querySelector('.load-btn').addEventListener('click', async () => {
+                const listData = await loadList(list.id);
+                if (listData) {
+                    setItems([]);
+                    if (listData.items && Array.isArray(listData.items)) setItems(listData.items);
+                    if (listData.supermarket) supermarketInput.value = listData.supermarket;
+                    if (listData.month) monthSelect.value = listData.month;
+                    if (listData.year) yearSelect.value = listData.year;
+                    if (listData.name) listNameInput.value = listData.name;
+
+                    setCurrentListId(listData.id);
+                    saveItems();
+                    renderItems();
+                    updateSummary();
+                    switchTab('current-tab');
+                    loadSharedUsersHandler();
+                    showMessage('List loaded successfully');
+                }
+            });
+
+            // 🗑️ Delete button handler
+            if (isOwner) {
+                listItem.querySelector('.delete-btn').addEventListener('click', async () => {
+                    if (confirm('Are you sure you want to delete this list?')) {
+                        const success = await deleteList(list.id);
+                        if (success) {
+                            if (getCurrentListId() === list.id) setCurrentListId(null);
+                            renderSavedLists();
+                            updateSummaryFilters();
+                            updateSavedFilters();
+                            generateSummaryHandler();
+                            showMessage('List deleted successfully');
+                        }
+                    }
+                });
+            }
+
+            savedListsContainer.appendChild(listItem);
+        });
+
+    } catch (error) {
+        console.error('Error loading saved lists:', error);
+        savedListsContainer.innerHTML = `
+            <div class="empty-state" style="padding: 20px;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error loading lists</p>
+            </div>
+        `;
     }
+}
+
     
     // Generate summary handler
     async function generateSummaryHandler() {
@@ -862,4 +836,5 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize the app
     init();
+
 });
