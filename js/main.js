@@ -1,11 +1,10 @@
 import { supabase } from './supabaseClient.js';
 import { checkAuthState, handleLogin, handleSignup, handleLogout, getCurrentUser } from './auth.js';
 import { initListManager, getItems, setItems, addItem, updateItem, deleteItem, toggleItemCompletion, calculateSummary, saveCurrentList, loadList, deleteList, shareList, loadSharedUsers, unshareList } from './listManager.js';
-import { showNotification, showMessage, showLoading, initDateSelectors, calculateItemTotals } from './utils.js';
+import { showNotification, showMessage, showLoading, initDateSelectors, calculateItemTotals, UNIT_CONVERSIONS, formatAmount } from './utils.js';
 import { exportToPdf, exportToExcel } from './exportUtils.js';
 import { generateSummary } from './summary.js';
-import { setCurrentListId } from './listManager.js'; // adjust path if needed
-
+import { setCurrentListId } from './listManager.js';
 
 // Main application initialization
 document.addEventListener('DOMContentLoaded', function() {
@@ -56,20 +55,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const yearlyItems = document.getElementById('yearly-items');
     const yearlyComparisonText = document.getElementById('yearly-comparison-text');
     
-    // Form inputs
+    // Form inputs for new unit system
     const hsn = document.getElementById('hsn');
     const itemDescription = document.getElementById('itemDescription');
     const itemQuantity = document.getElementById('itemQuantity');
-    const itemUom = document.getElementById('itemUom');
-    const itemMrp = document.getElementById('itemMrp');
-    const itemRate = document.getElementById('itemRate');
+    const itemTotalPrice = document.getElementById('itemTotalPrice');
     const itemGst = document.getElementById('itemGst');
+    
+    // Unit selection elements
+    const unitOptions = document.querySelectorAll('.unit-option');
+    const weightFields = document.getElementById('weightFields');
+    const liquidFields = document.getElementById('liquidFields');
+    const packageFields = document.getElementById('packageFields');
+    const itemWeight = document.getElementById('itemWeight');
+    const itemWeightUnit = document.getElementById('itemWeightUnit');
+    const itemLiquidVolume = document.getElementById('itemLiquidVolume');
+    const itemLiquidUnit = document.getElementById('itemLiquidUnit');
+    const itemPackageWeight = document.getElementById('itemPackageWeight');
+    const itemPackageUnit = document.getElementById('itemPackageUnit');
+    
+    // Calculation result elements
+    const calcBasePrice = document.getElementById('calcBasePrice');
+    const calcGstAmount = document.getElementById('calcGstAmount');
+    const calcPricePerUnit = document.getElementById('calcPricePerUnit');
+    const calcTotalAmount = document.getElementById('calcTotalAmount');
     
     // Navigation
     const navButtons = document.querySelectorAll('.nav-btn');
     
     // State
     let currentItemId = null;
+    let currentUnitType = 'weight';
     
     // Initialize the app
     async function init() {
@@ -86,6 +102,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Initialize date selectors
         initDateSelectors();
+        
+        // Initialize unit selection
+        setupUnitSelection();
         
         // Don't load any items by default
         setItems([]);
@@ -128,6 +147,127 @@ document.addEventListener('DOMContentLoaded', function() {
         itemModal.addEventListener('click', (e) => {
             if (e.target === itemModal) closeModal();
         });
+    }
+    
+    // Unit selection handling
+    function setupUnitSelection() {
+        unitOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const unitType = option.getAttribute('data-unit');
+                selectUnitType(unitType);
+            });
+        });
+        
+        // Input change listeners for real-time calculation
+        itemWeight.addEventListener('input', calculateValues);
+        itemWeightUnit.addEventListener('change', calculateValues);
+        itemLiquidVolume.addEventListener('input', calculateValues);
+        itemLiquidUnit.addEventListener('change', calculateValues);
+        itemPackageWeight.addEventListener('input', calculateValues);
+        itemPackageUnit.addEventListener('change', calculateValues);
+        itemQuantity.addEventListener('input', calculateValues);
+        itemTotalPrice.addEventListener('input', calculateValues);
+        itemGst.addEventListener('input', calculateValues);
+    }
+    
+    // Select unit type
+    function selectUnitType(unitType) {
+        currentUnitType = unitType;
+        
+        // Update UI
+        unitOptions.forEach(option => {
+            if (option.getAttribute('data-unit') === unitType) {
+                option.classList.add('selected');
+            } else {
+                option.classList.remove('selected');
+            }
+        });
+        
+        // Show/hide appropriate fields
+        weightFields.style.display = unitType === 'weight' ? 'block' : 'none';
+        liquidFields.style.display = unitType === 'liquid' ? 'block' : 'none';
+        packageFields.style.display = unitType === 'pack' ? 'block' : 'none';
+        
+        // Recalculate values
+        calculateValues();
+    }
+    
+    // Calculate values based on inputs
+    function calculateValues() {
+        const totalPrice = parseFloat(itemTotalPrice.value) || 0;
+        const gstPercentage = parseFloat(itemGst.value) || 0;
+        const quantity = parseFloat(itemQuantity.value) || 0;
+        
+        // Calculate base price and GST amount
+        const basePrice = totalPrice / (1 + (gstPercentage / 100));
+        const gstAmount = totalPrice - basePrice;
+        
+        // Calculate weight/volume information
+        let totalBaseAmount = 0;
+        let pricePerBaseUnit = 0;
+        let displayUnit = '';
+        
+        if (currentUnitType === 'weight') {
+            const weight = parseFloat(itemWeight.value) || 0;
+            const weightUnit = itemWeightUnit.value;
+            
+            // Convert to grams for calculation
+            totalBaseAmount = weight * (UNIT_CONVERSIONS.weight[weightUnit] || 1) * quantity;
+            
+            // Calculate price per kg
+            if (weight > 0) {
+                const weightInBaseUnit = weight * (UNIT_CONVERSIONS.weight[weightUnit] || 1);
+                pricePerBaseUnit = totalPrice / (weightInBaseUnit / 1000); // Price per kg
+            }
+            
+            displayUnit = 'kg';
+        } 
+        else if (currentUnitType === 'liquid') {
+            const volume = parseFloat(itemLiquidVolume.value) || 0;
+            const volumeUnit = itemLiquidUnit.value;
+            
+            // Convert to ml for calculation
+            totalBaseAmount = volume * (UNIT_CONVERSIONS.liquid[volumeUnit] || 1) * quantity;
+            
+            // Calculate price per liter
+            if (volume > 0) {
+                const volumeInBaseUnit = volume * (UNIT_CONVERSIONS.liquid[volumeUnit] || 1);
+                pricePerBaseUnit = totalPrice / (volumeInBaseUnit / 1000); // Price per liter
+            }
+            
+            displayUnit = 'l';
+        }
+        else if (currentUnitType === 'pack') {
+            const packAmount = parseFloat(itemPackageWeight.value) || 0;
+            const packUnit = itemPackageUnit.value;
+            
+            // Determine if it's weight or liquid
+            const unitType = ['g', 'kg'].includes(packUnit) ? 'weight' : 'liquid';
+            const conversions = UNIT_CONVERSIONS[unitType];
+            
+            // Convert to base unit for calculation
+            totalBaseAmount = packAmount * (conversions[packUnit] || 1) * quantity;
+            
+            // Calculate price per base unit (kg or liter)
+            if (packAmount > 0) {
+                const amountInBaseUnit = packAmount * (conversions[packUnit] || 1);
+                pricePerBaseUnit = totalPrice / (amountInBaseUnit / 1000); // Price per kg or liter
+            }
+            
+            displayUnit = unitType === 'weight' ? 'kg' : 'l';
+        }
+        else {
+            // Unit type (count)
+            totalBaseAmount = quantity;
+            pricePerBaseUnit = totalPrice / quantity; // Price per unit
+            displayUnit = 'unit';
+        }
+        
+        // Update calculation results
+        calcBasePrice.textContent = `₹${basePrice.toFixed(2)}`;
+        calcGstAmount.textContent = `₹${gstAmount.toFixed(2)}`;
+        calcPricePerUnit.textContent = `₹${pricePerBaseUnit.toFixed(2)}/${displayUnit}`;
+        calcTotalAmount.textContent = formatAmount(totalBaseAmount, currentUnitType, displayUnit);
     }
     
     // Show authentication UI
@@ -294,27 +434,49 @@ document.addEventListener('DOMContentLoaded', function() {
         if (item) {
             // Editing existing item
             modalTitle.textContent = 'Edit Item';
-            hsn.value = item.hsn;
-            itemDescription.value = item.description;
-            itemQuantity.value = item.quantity;
-            itemUom.value = item.uom;
-            itemMrp.value = item.mrp;
-            itemRate.value = item.rate;
-            itemGst.value = item.gst;
+            hsn.value = item.hsn || '';
+            itemDescription.value = item.description || '';
+            
+            // Set unit type and values
+            selectUnitType(item.unitType || 'weight');
+            
+            if (item.unitType === 'weight') {
+                itemWeight.value = item.weight || '';
+                itemWeightUnit.value = item.weightUnit || 'g';
+            } else if (item.unitType === 'liquid') {
+                itemLiquidVolume.value = item.liquidVolume || '';
+                itemLiquidUnit.value = item.liquidUnit || 'ml';
+            } else if (item.unitType === 'pack') {
+                itemPackageWeight.value = item.packageWeight || '';
+                itemPackageUnit.value = item.packageUnit || 'g';
+            }
+            
+            itemQuantity.value = item.quantity || 1;
+            itemTotalPrice.value = item.totalPrice || 0;
+            itemGst.value = item.gst || 5;
             currentItemId = item.id;
         } else {
             // Adding new item
             modalTitle.textContent = 'Add Item';
             hsn.value = '';
             itemDescription.value = '';
-            itemQuantity.value = '1';
-            itemUom.value = '';
-            itemMrp.value = '0';
-            itemRate.value = '0';
-            itemGst.value = '5';
+            selectUnitType('weight');
+            itemWeight.value = '';
+            itemWeightUnit.value = 'g';
+            itemLiquidVolume.value = '';
+            itemLiquidUnit.value = 'ml';
+            itemPackageWeight.value = '';
+            itemPackageUnit.value = 'g';
+            itemQuantity.value = 1;
+            itemTotalPrice.value = 0;
+            itemGst.value = 5;
             currentItemId = null;
         }
         
+        // Calculate initial values
+        calculateValues();
+        
+        // Show modal
         itemModal.classList.add('active');
     }
     
@@ -329,13 +491,24 @@ document.addEventListener('DOMContentLoaded', function() {
             id: currentItemId || Date.now().toString(),
             hsn: hsn.value,
             description: itemDescription.value,
+            unitType: currentUnitType,
             quantity: parseFloat(itemQuantity.value),
-            uom: itemUom.value,
-            mrp: parseFloat(itemMrp.value),
-            rate: parseFloat(itemRate.value),
+            totalPrice: parseFloat(itemTotalPrice.value),
             gst: parseFloat(itemGst.value),
             completed: false
         };
+        
+        // Add unit-specific data
+        if (currentUnitType === 'weight') {
+            newItem.weight = parseFloat(itemWeight.value);
+            newItem.weightUnit = itemWeightUnit.value;
+        } else if (currentUnitType === 'liquid') {
+            newItem.liquidVolume = parseFloat(itemLiquidVolume.value);
+            newItem.liquidUnit = itemLiquidUnit.value;
+        } else if (currentUnitType === 'pack') {
+            newItem.packageWeight = parseFloat(itemPackageWeight.value);
+            newItem.packageUnit = itemPackageUnit.value;
+        }
         
         if (!newItem.description) {
             showMessage('Please enter an item name', true);
@@ -390,10 +563,23 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const itemElement = document.createElement('div');
             itemElement.className = `item-card ${item.completed ? 'completed' : ''}`;
+            
+            // Determine display text based on unit type
+            let unitDisplay = '';
+            if (item.unitType === 'weight') {
+                unitDisplay = `${item.weight || 0} ${item.weightUnit || 'g'}`;
+            } else if (item.unitType === 'liquid') {
+                unitDisplay = `${item.liquidVolume || 0} ${item.liquidUnit || 'ml'}`;
+            } else if (item.unitType === 'pack') {
+                unitDisplay = `${item.packageWeight || 0} ${item.packageUnit || 'g'}`;
+            } else {
+                unitDisplay = `${item.quantity || 1} unit(s)`;
+            }
+            
             itemElement.innerHTML = `
                 <div class="item-header">
                     <input type="checkbox" class="item-check" ${item.completed ? 'checked' : ''}>
-                    <div class="item-title">${item.description}</div>
+                    <div class="item-title">${item.description} ${item.hsn ? `(HSN: ${item.hsn})` : ''}</div>
                     <div class="item-actions">
                         <button class="action-btn edit-btn"><i class="fas fa-edit"></i></button>
                         <button class="action-btn delete-btn"><i class="fas fa-trash"></i></button>
@@ -402,27 +588,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="item-details">
                     <div class="detail-group">
                         <span class="detail-label">Qty</span>
-                        <span class="detail-value">${item.quantity} ${item.uom}</span>
+                        <span class="detail-value">${item.quantity} × ${unitDisplay}</span>
                     </div>
                     <div class="detail-group">
-                        <span class="detail-label">Rate</span>
-                        <span class="detail-value">₹${item.rate.toFixed(2)}</span>
+                        <span class="detail-label">Total Price</span>
+                        <span class="detail-value">₹${item.totalPrice.toFixed(2)}</span>
                     </div>
                     <div class="detail-group">
                         <span class="detail-label">GST</span>
                         <span class="detail-value">${item.gst}%</span>
                     </div>
                     <div class="detail-group">
-                        <span class="detail-label">Discount</span>
-                        <span class="detail-value">${totals.discount}%</span>
+                        <span class="detail-label">Base Price</span>
+                        <span class="detail-value">₹${totals.basePrice}</span>
                     </div>
                     <div class="detail-group">
                         <span class="detail-label">GST Amt</span>
-                        <span class="detail-value">₹${totals.gstAmt}</span>
+                        <span class="detail-value">₹${totals.gstAmount}</span>
                     </div>
                     <div class="detail-group">
-                        <span class="detail-label">Total</span>
-                        <span class="detail-value">₹${totals.totalAmt}</span>
+                        <span class="detail-label">Price/${totals.displayUnit}</span>
+                        <span class="detail-value">₹${totals.pricePerBaseUnit}</span>
                     </div>
                 </div>
             `;
@@ -559,147 +745,146 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Render saved lists from Supabase
-async function renderSavedLists() {
-    savedListsContainer.innerHTML = '';
+    async function renderSavedLists() {
+        savedListsContainer.innerHTML = '';
 
-    try {
-        // 🔍 Fetch user's own lists
-        const { data: userLists, error: userError, status: userStatus } = await supabase
-            .from('grocery_lists')
-            .select('*')
-            .eq('user_id', getCurrentUser().id)
-            .order('created_at', { ascending: false });
+        try {
+            // Fetch user's own lists
+            const { data: userLists, error: userError, status: userStatus } = await supabase
+                .from('grocery_lists')
+                .select('*')
+                .eq('user_id', getCurrentUser().id)
+                .order('created_at', { ascending: false });
 
-        if (userError) {
-            console.error("Error fetching user lists:", {
-                status: userStatus,
-                message: userError.message,
-                details: userError.details,
-                hint: userError.hint
-            });
-            throw userError;
-        }
-
-        // 🔍 Fetch lists shared with the user
-        const { data: sharedLists, error: sharedError, status: sharedStatus } = await supabase
-            .from('list_shares')
-            .select('grocery_lists (*)')
-            .eq('user_id', getCurrentUser().id);
-
-        if (sharedError) {
-            console.error("Error fetching shared lists:", {
-                status: sharedStatus,
-                message: sharedError.message,
-                details: sharedError.details,
-                hint: sharedError.hint
-            });
-            throw sharedError;
-        }
-
-        // 🧠 Combine and filter lists
-        const allLists = [
-            ...userLists,
-            ...sharedLists.map(share => share.grocery_lists)
-        ];
-
-        const yearFilter = savedYearSelect.value;
-        const storeFilter = savedStoreSelect.value;
-
-        const filteredLists = allLists.filter(list => {
-            if (yearFilter !== 'all' && list.year != yearFilter) return false;
-            if (storeFilter !== 'all' && list.supermarket !== storeFilter) return false;
-            return true;
-        });
-
-        if (filteredLists.length === 0) {
-            savedListsContainer.innerHTML = `
-                <div class="empty-state" style="padding: 20px;">
-                    <i class="fas fa-folder-open"></i>
-                    <p>No saved lists found</p>
-                </div>
-            `;
-            return;
-        }
-
-        // 🧱 Render each list item
-        filteredLists.forEach(list => {
-            const listName = list.name || 'Unnamed List';
-            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            const monthName = months[list.month - 1] || 'Unknown';
-            const savedDate = new Date(list.created_at);
-            const formattedDate = savedDate.toLocaleDateString() + ' ' + savedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            const isOwner = list.user_id === getCurrentUser().id;
-
-            const listItem = document.createElement('div');
-            listItem.className = 'list-item';
-            listItem.innerHTML = `
-                <div class="list-info">
-                    <div class="list-name">${listName} ${!isOwner ? '(Shared)' : ''}</div>
-                    <div class="list-details">
-                        <span class="list-detail-item"><i class="fas fa-calendar"></i> ${monthName} ${list.year}</span>
-                        <span class="list-detail-item"><i class="fas fa-store"></i> ${list.supermarket || 'Unknown Store'}</span>
-                        <span class="list-detail-item"><i class="fas fa-receipt"></i> ₹${list.total_amount || '0.00'}</span>
-                        <span class="list-detail-item"><i class="fas fa-clock"></i> ${formattedDate}</span>
-                    </div>
-                </div>
-                <div class="list-actions">
-                    <button class="btn btn-save load-btn">Load</button>
-                    ${isOwner ? `<button class="btn btn-delete delete-btn">Delete</button>` : ''}
-                </div>
-            `;
-
-            // 🧭 Load button handler
-            listItem.querySelector('.load-btn').addEventListener('click', async () => {
-                const listData = await loadList(list.id);
-                if (listData) {
-                    setItems([]);
-                    if (listData.items && Array.isArray(listData.items)) setItems(listData.items);
-                    if (listData.supermarket) supermarketInput.value = listData.supermarket;
-                    if (listData.month) monthSelect.value = listData.month;
-                    if (listData.year) yearSelect.value = listData.year;
-                    if (listData.name) listNameInput.value = listData.name;
-
-                    setCurrentListId(listData.id);
-                    saveItems();
-                    renderItems();
-                    updateSummary();
-                    switchTab('current-tab');
-                    loadSharedUsersHandler();
-                    showMessage('List loaded successfully');
-                }
-            });
-
-            // 🗑️ Delete button handler
-            if (isOwner) {
-                listItem.querySelector('.delete-btn').addEventListener('click', async () => {
-                    if (confirm('Are you sure you want to delete this list?')) {
-                        const success = await deleteList(list.id);
-                        if (success) {
-                            if (getCurrentListId() === list.id) setCurrentListId(null);
-                            renderSavedLists();
-                            updateSummaryFilters();
-                            updateSavedFilters();
-                            generateSummaryHandler();
-                            showMessage('List deleted successfully');
-                        }
-                    }
+            if (userError) {
+                console.error("Error fetching user lists:", {
+                    status: userStatus,
+                    message: userError.message,
+                    details: userError.details,
+                    hint: userError.hint
                 });
+                throw userError;
             }
 
-            savedListsContainer.appendChild(listItem);
-        });
+            // Fetch lists shared with the user
+            const { data: sharedLists, error: sharedError, status: sharedStatus } = await supabase
+                .from('list_shares')
+                .select('grocery_lists (*)')
+                .eq('user_id', getCurrentUser().id);
 
-    } catch (error) {
-        console.error('Error loading saved lists:', error);
-        savedListsContainer.innerHTML = `
-            <div class="empty-state" style="padding: 20px;">
-                <i class="fas fa-exclamation-triangle"></i>
-                <p>Error loading lists</p>
-            </div>
-        `;
+            if (sharedError) {
+                console.error("Error fetching shared lists:", {
+                    status: sharedStatus,
+                    message: sharedError.message,
+                    details: sharedError.details,
+                    hint: sharedError.hint
+                });
+                throw sharedError;
+            }
+
+            // Combine and filter lists
+            const allLists = [
+                ...userLists,
+                ...sharedLists.map(share => share.grocery_lists)
+            ];
+
+            const yearFilter = savedYearSelect.value;
+            const storeFilter = savedStoreSelect.value;
+
+            const filteredLists = allLists.filter(list => {
+                if (yearFilter !== 'all' && list.year != yearFilter) return false;
+                if (storeFilter !== 'all' && list.supermarket !== storeFilter) return false;
+                return true;
+            });
+
+            if (filteredLists.length === 0) {
+                savedListsContainer.innerHTML = `
+                    <div class="empty-state" style="padding: 20px;">
+                        <i class="fas fa-folder-open"></i>
+                        <p>No saved lists found</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Render each list item
+            filteredLists.forEach(list => {
+                const listName = list.name || 'Unnamed List';
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                const monthName = months[list.month - 1] || 'Unknown';
+                const savedDate = new Date(list.created_at);
+                const formattedDate = savedDate.toLocaleDateString() + ' ' + savedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const isOwner = list.user_id === getCurrentUser().id;
+
+                const listItem = document.createElement('div');
+                listItem.className = 'list-item';
+                listItem.innerHTML = `
+                    <div class="list-info">
+                        <div class="list-name">${listName} ${!isOwner ? '(Shared)' : ''}</div>
+                        <div class="list-details">
+                            <span class="list-detail-item"><i class="fas fa-calendar"></i> ${monthName} ${list.year}</span>
+                            <span class="list-detail-item"><i class="fas fa-store"></i> ${list.supermarket || 'Unknown Store'}</span>
+                            <span class="list-detail-item"><i class="fas fa-receipt"></i> ₹${list.total_amount || '0.00'}</span>
+                            <span class="list-detail-item"><i class="fas fa-clock"></i> ${formattedDate}</span>
+                        </div>
+                    </div>
+                    <div class="list-actions">
+                        <button class="btn btn-save load-btn">Load</button>
+                        ${isOwner ? `<button class="btn btn-delete delete-btn">Delete</button>` : ''}
+                    </div>
+                `;
+
+                // Load button handler
+                listItem.querySelector('.load-btn').addEventListener('click', async () => {
+                    const listData = await loadList(list.id);
+                    if (listData) {
+                        setItems([]);
+                        if (listData.items && Array.isArray(listData.items)) setItems(listData.items);
+                        if (listData.supermarket) supermarketInput.value = listData.supermarket;
+                        if (listData.month) monthSelect.value = listData.month;
+                        if (listData.year) yearSelect.value = listData.year;
+                        if (listData.name) listNameInput.value = listData.name;
+
+                        setCurrentListId(listData.id);
+                        saveItems();
+                        renderItems();
+                        updateSummary();
+                        switchTab('current-tab');
+                        loadSharedUsersHandler();
+                        showMessage('List loaded successfully');
+                    }
+                });
+
+                // Delete button handler
+                if (isOwner) {
+                    listItem.querySelector('.delete-btn').addEventListener('click', async () => {
+                        if (confirm('Are you sure you want to delete this list?')) {
+                            const success = await deleteList(list.id);
+                            if (success) {
+                                if (getCurrentListId() === list.id) setCurrentListId(null);
+                                renderSavedLists();
+                                updateSummaryFilters();
+                                updateSavedFilters();
+                                generateSummaryHandler();
+                                showMessage('List deleted successfully');
+                            }
+                        }
+                    });
+                }
+
+                savedListsContainer.appendChild(listItem);
+            });
+
+        } catch (error) {
+            console.error('Error loading saved lists:', error);
+            savedListsContainer.innerHTML = `
+                <div class="empty-state" style="padding: 20px;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error loading lists</p>
+                </div>
+            `;
+        }
     }
-}
-
     
     // Generate summary handler
     async function generateSummaryHandler() {
@@ -842,7 +1027,4 @@ async function renderSavedLists() {
     
     // Initialize the app
     init();
-
 });
-
-
