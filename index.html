@@ -12,9 +12,13 @@
     <!-- Include Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
     <!-- CSS Files -->
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/auth.css">
+    <link rel="stylesheet" href="css/modal.css"/>
 </head>
 <body>
     <!-- Auth Container (initially visible) -->
@@ -258,25 +262,82 @@
                     <label class="form-label" for="itemDescription">Item Name</label>
                     <input type="text" class="form-input" id="itemDescription" placeholder="Enter item name">
                 </div>
+                
+                <div class="unit-selector">
+                    <div class="unit-option selected" data-unit="weight">Weight (g/kg)</div>
+                    <div class="unit-option" data-unit="liquid">Liquid (ml/l)</div>
+                    <div class="unit-option" data-unit="pack">Package</div>
+                    <div class="unit-option" data-unit="unit">Unit</div>
+                </div>
+                
+                <div class="form-group" id="weightFields">
+                    <label class="form-label" for="itemWeight">Weight</label>
+                    <div class="input-with-unit">
+                        <input type="number" class="form-input" id="itemWeight" min="0" step="0.001" placeholder="Weight">
+                        <select class="form-input unit-select" id="itemWeightUnit">
+                            <option value="g">g</option>
+                            <option value="kg">kg</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group" id="liquidFields" style="display: none;">
+                    <label class="form-label" for="itemLiquidVolume">Volume</label>
+                    <div class="input-with-unit">
+                        <input type="number" class="form-input" id="itemLiquidVolume" min="0" step="0.001" placeholder="Volume">
+                        <select class="form-input unit-select" id="itemLiquidUnit">
+                            <option value="ml">ml</option>
+                            <option value="l">l</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group" id="packageFields" style="display: none;">
+                    <label class="form-label" for="itemPackageWeight">Package Weight/Volume</label>
+                    <div class="input-with-unit">
+                        <input type="number" class="form-input" id="itemPackageWeight" min="0" step="0.001" placeholder="Package weight/volume">
+                        <select class="form-input unit-select" id="itemPackageUnit">
+                            <option value="g">g</option>
+                            <option value="kg">kg</option>
+                            <option value="ml">ml</option>
+                            <option value="l">l</option>
+                        </select>
+                    </div>
+                </div>
+                
                 <div class="form-group">
                     <label class="form-label" for="itemQuantity">Quantity</label>
                     <input type="number" class="form-input" id="itemQuantity" min="1" value="1">
                 </div>
+                
                 <div class="form-group">
-                    <label class="form-label" for="itemUom">Unit</label>
-                    <input type="text" class="form-input" id="itemUom" placeholder="e.g., kg, pcs">
+                    <label class="form-label" for="itemTotalPrice">Total Price (₹) - Including GST</label>
+                    <input type="number" class="form-input" id="itemTotalPrice" min="0" value="0" step="0.01">
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="itemMrp">MRP (₹)</label>
-                    <input type="number" class="form-input" id="itemMrp" min="0" value="0" step="0.01">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="itemRate">Rate (₹)</label>
-                    <input type="number" class="form-input" id="itemRate" min="0" value="0" step="0.01">
-                </div>
+                
                 <div class="form-group">
                     <label class="form-label" for="itemGst">GST (%)</label>
                     <input type="number" class="form-input" id="itemGst" min="0" value="5" step="1">
+                </div>
+                
+                <div class="calculation-results">
+                    <h4>Calculation Results</h4>
+                    <div class="calculation-row">
+                        <span class="calculation-label">Base Price:</span>
+                        <span class="calculation-value" id="calcBasePrice">₹0.00</span>
+                    </div>
+                    <div class="calculation-row">
+                        <span class="calculation-label">GST Amount:</span>
+                        <span class="calculation-value" id="calcGstAmount">₹0.00</span>
+                    </div>
+                    <div class="calculation-row">
+                        <span class="calculation-label">Price per kg/l:</span>
+                        <span class="calculation-value" id="calcPricePerUnit">₹0.00/kg</span>
+                    </div>
+                    <div class="calculation-row">
+                        <span class="calculation-label">Total Weight/Volume:</span>
+                        <span class="calculation-value" id="calcTotalAmount">0g</span>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -293,13 +354,12 @@
     </div>
 
     <!-- JavaScript Files -->
-    <script type="module" src="js/supabaseClient.js"></script>
-    <script type="module" src="js/utils.js"></script>
-    <script type="module" src="js/auth.js"></script>
-    <script type="module" src="js/listManager.js"></script>
-    <script type="module" src="js/exportUtils.js"></script>
-    <script type="module" src="js/summary.js"></script>
-    <script type="module" src="js/main.js"></script>
+    <script src="js/supabaseClient.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/listManager.js"></script>
+    <script src="js/exportUtils.js"></script>
+    <script src="js/summary.js"></script>
+    <script src="js/main.js"></script>
 </body>
-
 </html>
