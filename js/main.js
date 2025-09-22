@@ -591,7 +591,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <div class="detail-group">
                         <span class="detail-label">Total Price</span>
-                        <span class="detail-value">₹${item.totalPrice.toFixed(2)}</span>
+                        <span class="detail-value">₹${typeof item.totalPrice === 'number' ? item.totalPrice.toFixed(2) : '0.00'}</span>
                     </div>
                     <div class="detail-group">
                         <span class="detail-label">GST</span>
@@ -1027,4 +1027,5 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize the app
     init();
 });
+
 
