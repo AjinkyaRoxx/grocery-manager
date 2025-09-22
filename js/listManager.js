@@ -68,6 +68,8 @@ export function toggleItemCompletion(id) {
 
 // Calculate summary
 export function calculateSummary() {
+    console.log('Items:', items); // ← Add this line here
+
     let subtotal = 0;
     let totalDiscount = 0;
     let totalGst = 0;
@@ -75,9 +77,14 @@ export function calculateSummary() {
 
     items.forEach(item => {
         if (!item.completed) {
-            const total = item.quantity * item.rate;
-            const discountAmount = item.mrp > 0 ? (item.mrp - item.rate) * item.quantity : 0;
-            const gstAmt = total * (item.gst / 100);
+            const quantity = typeof item.quantity === 'number' ? item.quantity : 0;
+            const rate = typeof item.rate === 'number' ? item.rate : 0;
+            const mrp = typeof item.mrp === 'number' ? item.mrp : 0;
+            const gst = typeof item.gst === 'number' ? item.gst : 0;
+
+            const total = quantity * rate;
+            const discountAmount = mrp > 0 ? (mrp - rate) * quantity : 0;
+            const gstAmt = total * (gst / 100);
 
             subtotal += total;
             totalDiscount += discountAmount;
@@ -256,3 +263,4 @@ export async function unshareList(userId, listId) {
         return false;
     }
 }
+
