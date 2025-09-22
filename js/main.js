@@ -1,10 +1,9 @@
 import { supabase } from './supabaseClient.js';
 import { checkAuthState, handleLogin, handleSignup, handleLogout, getCurrentUser } from './auth.js';
-import { initListManager, getItems, setItems, addItem, updateItem, deleteItem, toggleItemCompletion, calculateSummary, saveCurrentList, loadList, deleteList, shareList, loadSharedUsers, unshareList } from './listManager.js';
+import { initListManager, getItems, setItems, addItem, updateItem, deleteItem, toggleItemCompletion, calculateSummary, saveCurrentList, loadList, deleteList, shareList, loadSharedUsers, unshareList, getCurrentListId, setCurrentListId } from './listManager.js';
 import { showNotification, showMessage, showLoading, initDateSelectors, calculateItemTotals, UNIT_CONVERSIONS, formatAmount } from './utils.js';
 import { exportToPdf, exportToExcel } from './exportUtils.js';
 import { generateSummary } from './summary.js';
-import { setCurrentListId } from './listManager.js';
 
 // Main application initialization
 document.addEventListener('DOMContentLoaded', function() {
@@ -1028,3 +1027,4 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize the app
     init();
 });
+
