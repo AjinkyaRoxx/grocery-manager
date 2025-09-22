@@ -4,6 +4,8 @@ import { initListManager, getItems, setItems, addItem, updateItem, deleteItem, t
 import { showNotification, showMessage, showLoading, initDateSelectors, calculateItemTotals } from './utils.js';
 import { exportToPdf, exportToExcel } from './exportUtils.js';
 import { generateSummary } from './summary.js';
+import { setCurrentListId } from './listManager.js'; // adjust path if needed
+
 
 // Main application initialization
 document.addEventListener('DOMContentLoaded', function() {
@@ -838,3 +840,4 @@ async function renderSavedLists() {
     init();
 
 });
+
