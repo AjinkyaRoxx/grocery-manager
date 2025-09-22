@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const yearlyComparisonText = document.getElementById('yearly-comparison-text');
     
     // Form inputs
+    const hsn = document.getElementById('hsn');
     const itemDescription = document.getElementById('itemDescription');
     const itemQuantity = document.getElementById('itemQuantity');
     const itemUom = document.getElementById('itemUom');
@@ -293,6 +294,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (item) {
             // Editing existing item
             modalTitle.textContent = 'Edit Item';
+            hsn.value = item.hsn;
             itemDescription.value = item.description;
             itemQuantity.value = item.quantity;
             itemUom.value = item.uom;
@@ -303,6 +305,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             // Adding new item
             modalTitle.textContent = 'Add Item';
+            hsn.value = '';
             itemDescription.value = '';
             itemQuantity.value = '1';
             itemUom.value = '';
@@ -324,6 +327,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function saveItem() {
         const newItem = {
             id: currentItemId || Date.now().toString(),
+            hsn: hsn.value,
             description: itemDescription.value,
             quantity: parseFloat(itemQuantity.value),
             uom: itemUom.value,
@@ -840,4 +844,5 @@ async function renderSavedLists() {
     init();
 
 });
+
 
