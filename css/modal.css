@@ -1,0 +1,75 @@
+/* Unit selector styles */
+.unit-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.unit-option {
+    flex: 1;
+    min-width: 100px;
+    padding: 10px;
+    text-align: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.9rem;
+}
+
+.unit-option.selected {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.unit-option:hover:not(.selected) {
+    background: var(--bg);
+}
+
+/* Input with unit selector */
+.input-with-unit {
+    display: flex;
+    gap: 10px;
+}
+
+.input-with-unit .form-input {
+    flex: 1;
+}
+
+.input-with-unit .unit-select {
+    width: 80px;
+    flex-shrink: 0;
+}
+
+/* Calculation results */
+.calculation-results {
+    background: var(--bg);
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    margin-top: 20px;
+    border: 1px solid var(--border);
+}
+
+.calculation-results h4 {
+    margin-bottom: 12px;
+    color: var(--primary);
+    font-size: 1rem;
+}
+
+.calculation-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.calculation-label {
+    color: var(--text-light);
+}
+
+.calculation-value {
+    font-weight: 500;
+    color: var(--text);
+}
