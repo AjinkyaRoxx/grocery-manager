@@ -6,6 +6,13 @@ let items = [];
 let currentListId = null;
 let sharedUsers = [];
 
+// 🔐 Helper: Get current user ID safely
+async function getCurrentUserId() {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) throw new Error('User not authenticated');
+    return user.id;
+}
+
 // Initialize list manager
 export function initListManager() {
     items = [];
@@ -65,20 +72,20 @@ export function calculateSummary() {
     let totalDiscount = 0;
     let totalGst = 0;
     let totalAmount = 0;
-    
+
     items.forEach(item => {
         if (!item.completed) {
             const total = item.quantity * item.rate;
             const discountAmount = item.mrp > 0 ? (item.mrp - item.rate) * item.quantity : 0;
             const gstAmt = total * (item.gst / 100);
-            
+
             subtotal += total;
             totalDiscount += discountAmount;
             totalGst += gstAmt;
             totalAmount += total + gstAmt;
         }
     });
-    
+
     return {
         subtotal: subtotal.toFixed(2),
         totalDiscount: totalDiscount.toFixed(2),
@@ -91,7 +98,8 @@ export function calculateSummary() {
 export async function saveCurrentList(listData) {
     try {
         let listId = currentListId;
-        
+        const userId = await getCurrentUserId();
+
         if (listId) {
             // Update existing list
             const { error } = await supabase
@@ -106,8 +114,8 @@ export async function saveCurrentList(listData) {
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', listId)
-                .eq('user_id', getCurrentUser().id);
-                
+                .eq('user_id', userId);
+
             if (error) throw error;
         } else {
             // Create new list
@@ -120,17 +128,17 @@ export async function saveCurrentList(listData) {
                     year: listData.year,
                     items: listData.items,
                     total_amount: parseFloat(listData.totalAmount),
-                    user_id: getCurrentUser().id
+                    user_id: userId
                 })
                 .select()
                 .single();
-                
+
             if (error) throw error;
-            
+
             listId = data.id;
             currentListId = listId;
         }
-        
+
         return listId;
     } catch (error) {
         showMessage('Error saving list: ' + error.message, true);
@@ -146,9 +154,9 @@ export async function loadList(listId) {
             .select('*')
             .eq('id', listId)
             .single();
-            
+
         if (error) throw error;
-        
+
         return data;
     } catch (error) {
         showMessage('Error loading list: ' + error.message, true);
@@ -159,20 +167,21 @@ export async function loadList(listId) {
 // Delete a list from Supabase
 export async function deleteList(listId) {
     try {
+        const userId = await getCurrentUserId();
+
         const { error } = await supabase
             .from('grocery_lists')
             .delete()
             .eq('id', listId)
-            .eq('user_id', getCurrentUser().id);
-        
+            .eq('user_id', userId);
+
         if (error) throw error;
-        
-        // Also delete any shares associated with this list
+
         await supabase
             .from('list_shares')
             .delete()
             .eq('list_id', listId);
-        
+
         return true;
     } catch (error) {
         showMessage('Error deleting list: ' + error.message, true);
@@ -182,19 +191,17 @@ export async function deleteList(listId) {
 
 // Share list with another user
 export async function shareList(email, listId) {
-    // Get the user ID for the email
     const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', email)
         .single();
-    
+
     if (userError || !userData) {
         showMessage('User not found', true);
         return false;
     }
-    
-    // Add share record
+
     const { error } = await supabase
         .from('list_shares')
         .insert({
@@ -202,7 +209,7 @@ export async function shareList(email, listId) {
             user_id: userData.id,
             can_edit: true
         });
-    
+
     if (error) {
         showMessage('Error sharing list: ' + error.message, true);
         return false;
@@ -221,9 +228,9 @@ export async function loadSharedUsers(listId) {
                 profiles (email)
             `)
             .eq('list_id', listId);
-        
+
         if (error) throw error;
-        
+
         sharedUsers = data;
         return data;
     } catch (error) {
@@ -240,9 +247,9 @@ export async function unshareList(userId, listId) {
             .delete()
             .eq('list_id', listId)
             .eq('user_id', userId);
-        
+
         if (error) throw error;
-        
+
         return true;
     } catch (error) {
         showMessage('Error removing share: ' + error.message, true);
